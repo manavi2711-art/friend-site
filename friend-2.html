@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>A Small Something, For You</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Nunito:wght@300;400;600;700&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.2/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+
+<style>
+/* =========================================================
+   CONFIG-DRIVEN DESIGN TOKENS
+   ========================================================= */
+:root{
+  --bg:#FDFBF7;
+  --cream:#FAF5EF;
+  --sage:#C9D8C5;
+  --lavender:#D8CFE8;
+  --powder:#D6E8F2;
+  --peach:#F3DDD3;
+  --charcoal:#4A4742;
+  --gold:#D8B87C;
+  --shadow: 0 10px 30px -12px rgba(74,71,66,0.18);
+  --shadow-soft: 0 4px 18px -6px rgba(74,71,66,0.12);
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);overflow:hidden;}
+body{
+  font-family:'Nunito',sans-serif;
+  color:var(--charcoal);
+  cursor:none;
+}
+img{ -webkit-user-drag:none; user-select:none; }
+h1,h2,h3{ font-family:'Cormorant Garamond', serif; font-weight:500; margin:0; }
+.hand{ font-family:'Caveat', cursive; }
+button{ font-family:'Nunito', sans-serif; border:none; background:none; cursor:none; }
+
+#app{ position:relative; width:100vw; height:100vh; overflow:hidden; }
+
+.page{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column;
+  padding:6vh 6vw;
+  opacity:0; visibility:hidden; pointer-events:none;
+  overflow-y:auto; overflow-x:hidden;
+}
+.page.active{ opacity:1; visibility:visible; pointer-events:auto; }
+
+/* soft grain / paper texture overlay for warmth */
+.grain{
+  position:absolute; inset:0; pointer-events:none; z-index:5; opacity:0.035; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* custom cursor */
+#cursor{
+  position:fixed; top:0; left:0; width:16px; height:16px; border-radius:50%;
+  background:radial-gradient(circle, rgba(216,184,124,0.9) 0%, rgba(216,184,124,0.15) 70%, transparent 100%);
+  pointer-events:none; z-index:9999; transform:translate(-50%,-50%);
+  box-shadow:0 0 12px 2px rgba(216,184,124,0.5);
+}
+
+/* ============ PAGE 1: LOADING ============ */
+#page-loading{
+  background:linear-gradient(rgba(30,28,24,0.55), rgba(30,28,24,0.65)),
+             radial-gradient(circle at 30% 20%, #6b6154, #2f2b26 75%);
+  color:#FDFBF7; justify-content:center;
+}
+.loading-wrap{ text-align:center; max-width:480px; }
+.loading-wrap h3{ font-family:'Caveat', cursive; font-size:2rem; margin-bottom:1.6rem; color:#F3DDD3; font-weight:600; letter-spacing:0.5px; }
+.bar-track{ width:min(60vw,320px); height:2px; background:rgba(255,255,255,0.25); margin:0 auto; border-radius:2px; overflow:hidden; }
+.bar-fill{ height:100%; width:0%; background:var(--gold); box-shadow:0 0 8px var(--gold); }
+.bar-pct{ margin-top:0.9rem; font-size:0.8rem; letter-spacing:3px; opacity:0.7; }
+.flash{ position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:200; }
+
+/* ============ PAGE 2: WELCOME ============ */
+#page-welcome{ background:radial-gradient(ellipse at top, var(--cream), var(--bg) 65%); text-align:center; }
+.welcome-heading{ font-size:clamp(2.1rem, 6vw, 3.4rem); line-height:1.15; }
+.welcome-heading .name{ color:var(--gold); font-style:italic; }
+.welcome-sub{ max-width:420px; margin:1.1rem auto 2.2rem; font-size:1.02rem; line-height:1.7; color:#6b665f; }
+.polaroid{
+  background:#fff; padding:14px 14px 44px; border-radius:2px; box-shadow:var(--shadow);
+  transform:rotate(-3deg); display:inline-block; position:relative; margin-bottom:2rem;
+}
+.polaroid .tape{
+  position:absolute; top:-10px; left:50%; transform:translateX(-50%) rotate(-2deg);
+  width:70px; height:22px; background:rgba(216,184,124,0.35); border:1px solid rgba(216,184,124,0.45);
+}
+.polaroid .photo-inner{
+  width:min(56vw,220px); height:min(56vw,220px);
+  background:linear-gradient(135deg, var(--sage), var(--powder));
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.polaroid img{ width:100%; height:100%; object-fit:cover; display:block; }
+.polaroid .cap{ position:absolute; bottom:10px; left:0; right:0; text-align:center; font-family:'Caveat',cursive; font-size:1.1rem; color:#8a8378; }
+
+.btn{
+  padding:0.85rem 2rem; border-radius:999px; font-size:0.95rem; letter-spacing:0.3px;
+  background:var(--charcoal); color:var(--cream); box-shadow:var(--shadow-soft);
+  transition:transform 0.35s cubic-bezier(.2,.9,.3,1), box-shadow 0.35s;
+}
+.btn:hover{ transform:translateY(-4px); box-shadow:0 16px 26px -10px rgba(74,71,66,0.32); }
+.btn.ghost{ background:transparent; border:1px solid rgba(74,71,66,0.3); color:var(--charcoal); }
+
+/* ============ PAGE 3: MEMORIES ============ */
+#page-memories{ background:linear-gradient(180deg, var(--bg), var(--cream)); }
+.mem-title{ font-size:clamp(1.7rem,4.5vw,2.4rem); margin-bottom:0.3rem; text-align:center; }
+.mem-sub{ color:#8a8378; font-size:0.92rem; margin-bottom:0.4rem; text-align:center; }
+.tracker{ font-family:'Caveat',cursive; font-size:1.3rem; color:var(--gold); margin-bottom:1.6rem; }
+
+.envelopes{
+  display:grid; grid-template-columns:repeat(2,minmax(110px,180px)); gap:clamp(18px,3vw,28px);
+  justify-content:center; max-width:520px;
+}
+.envelope-wrap{ display:flex; flex-direction:column; align-items:center; }
+.envelope{
+  width:100%; aspect-ratio:1.4/1; position:relative; cursor:none;
+  filter:drop-shadow(0 10px 16px rgba(74,71,66,0.16));
+}
+.envelope .body{
+  position:absolute; inset:0; border-radius:6px;
+  background:var(--cream); border:1px solid rgba(74,71,66,0.08);
+}
+.envelope .flap{
+  position:absolute; top:0; left:0; right:0; height:58%;
+  background:var(--peach);
+  clip-path:polygon(0 0, 100% 0, 50% 100%);
+  transform-origin:top center; border-radius:6px 6px 0 0;
+  transition:transform 0.7s cubic-bezier(.2,.9,.2,1);
+}
+.envelope.open .flap{ transform:rotateX(160deg); }
+.envelope .seal{
+  position:absolute; top:38%; left:50%; transform:translate(-50%,-50%);
+  width:34px; height:34px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #c78a4d, var(--gold));
+  box-shadow:var(--shadow-soft); display:flex; align-items:center; justify-content:center;
+  font-family:'Cormorant Garamond',serif; color:#fff8ec; font-size:0.85rem; font-weight:600;
+  transition:opacity 0.4s, transform 0.4s;
+}
+.envelope.open .seal{ opacity:0; transform:translate(-50%,-50%) scale(0.4); }
+.envelope.opened-state .body{ background:var(--sage); opacity:0.55; }
+.envelope-label{ margin-top:0.7rem; font-size:0.8rem; color:#8a8378; text-align:center; }
+.envelope.shake{ animation:shake 0.5s; }
+@keyframes shake{
+  0%,100%{ transform:rotate(0); } 20%{ transform:rotate(-4deg); } 40%{ transform:rotate(4deg); }
+  60%{ transform:rotate(-3deg); } 80%{ transform:rotate(3deg); }
+}
+
+.note-slide{
+  position:fixed; left:50%; bottom:6vh; transform:translate(-50%,20px);
+  background:#fff; padding:1.1rem 1.6rem; border-radius:4px; box-shadow:var(--shadow);
+  font-family:'Caveat',cursive; font-size:1.3rem; max-width:min(80vw,340px); text-align:center;
+  opacity:0; pointer-events:none; z-index:50;
+}
+
+.memory-detail{
+  position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center;
+  background:rgba(253,251,247,0.97); opacity:0; pointer-events:none; flex-direction:column; padding:6vh 6vw;
+}
+.memory-detail.active{ opacity:1; pointer-events:auto; }
+.memory-detail .polaroid{ transform:rotate(-2deg); margin-bottom:1.4rem; }
+.memory-detail h3{ font-size:1.6rem; margin-bottom:0.4rem; text-align:center; }
+.memory-detail p{ max-width:420px; text-align:center; line-height:1.7; color:#6b665f; font-size:0.98rem; }
+.memory-detail .date{ font-family:'Caveat',cursive; color:var(--gold); font-size:1.1rem; margin-top:0.4rem; }
+.close-x{ position:absolute; top:5vh; right:6vw; font-size:1.6rem; color:#8a8378; }
+
+/* ============ PAGE 4: CELEBRATION ============ */
+#page-celebration{ background:#fff; }
+.celebrate-text{ font-size:clamp(2.2rem,7vw,3.6rem); text-align:center; }
+
+/* ============ PAGE 5: LETTER ============ */
+#page-letter{ background:linear-gradient(180deg, var(--lavender) 0%, var(--bg) 55%); }
+.letter-env{
+  width:min(70vw,220px); aspect-ratio:1.4/1; position:relative; cursor:none;
+  filter:drop-shadow(0 14px 22px rgba(74,71,66,0.2));
+}
+.letter-paper{
+  width:min(88vw,480px); max-height:80vh; overflow-y:auto; background:var(--cream);
+  padding:2.2rem 2rem; box-shadow:var(--shadow); border-radius:3px;
+  transform:scale(0.9); opacity:0; display:none;
+  background-image: repeating-linear-gradient(rgba(74,71,66,0.05) 0 1px, transparent 1px 2.4em);
+}
+.letter-paper p{ font-family:'Caveat',cursive; font-size:1.35rem; line-height:2.4em; color:var(--charcoal); white-space:pre-wrap; margin:0; }
+.letter-hint{ margin-top:1.2rem; color:#8a8378; font-size:0.85rem; }
+
+/* ============ PAGE 6: PROMISE ============ */
+#page-promise{ background:radial-gradient(ellipse at bottom, var(--peach), var(--bg) 70%); text-align:center; }
+.promise-q{ font-size:clamp(1.8rem,5vw,2.6rem); margin-bottom:2.2rem; }
+.promise-btns{ display:flex; gap:1.2rem; flex-wrap:wrap; justify-content:center; }
+.promise-answer{ margin-top:1.6rem; font-family:'Caveat',cursive; font-size:1.6rem; color:var(--gold); opacity:0; }
+
+/* ============ PAGE 7: ENDING ============ */
+#page-ending{
+  background:linear-gradient(180deg,#2b3350 0%,#4a4b6b 45%,#8a7a86 100%);
+  color:#FDFBF7; text-align:center; overflow:hidden;
+}
+.stars{ position:absolute; inset:0; }
+.star-dot{ position:absolute; width:2px; height:2px; background:#fff; border-radius:50%; opacity:0.7; }
+.lantern{
+  position:absolute; bottom:-10%; width:26px; height:34px; border-radius:50% 50% 45% 45%;
+  background:radial-gradient(circle at 50% 35%, #ffe6b3, var(--gold) 70%);
+  box-shadow:0 0 18px 4px rgba(216,184,124,0.5);
+}
+.lantern::after{ content:''; position:absolute; bottom:-8px; left:50%; transform:translateX(-50%); width:1px; height:8px; background:rgba(255,255,255,0.4); }
+.ending-title{ font-size:clamp(1.9rem,5.5vw,2.8rem); margin:1.4rem 0 0.3rem; position:relative; z-index:2; }
+.ending-status{ font-family:'Caveat',cursive; color:var(--gold); font-size:1.3rem; letter-spacing:1px; position:relative; z-index:2; }
+.ending-quote{ max-width:380px; margin:1.6rem auto 0; line-height:1.8; font-size:0.98rem; opacity:0.85; position:relative; z-index:2; }
+#page-ending .polaroid{ position:relative; z-index:2; }
+
+/* ============ SHARED UI ============ */
+#music-toggle{
+  position:fixed; top:20px; right:20px; z-index:200; width:44px; height:44px; border-radius:50%;
+  background:rgba(255,255,255,0.65); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow-soft); font-size:1.1rem;
+}
+#progress-dot{
+  position:fixed; top:24px; left:24px; z-index:200; font-size:0.72rem; letter-spacing:2px; color:#8a8378; opacity:0.7;
+}
+.secret-star{
+  position:fixed; width:8px; height:8px; border-radius:50%; background:var(--gold); opacity:0.55;
+  box-shadow:0 0 8px 2px rgba(216,184,124,0.6); z-index:60; cursor:none;
+  animation:twinkle 2.2s ease-in-out infinite;
+}
+@keyframes twinkle{ 0%,100%{ opacity:0.3; } 50%{ opacity:0.9; } }
+
+.stats-modal, .achieve-modal{
+  position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center;
+  background:rgba(74,71,66,0.45); opacity:0; pointer-events:none;
+}
+.stats-modal.active, .achieve-modal.active{ opacity:1; pointer-events:auto; }
+.stats-card{
+  background:var(--cream); border-radius:8px; padding:2rem 2.4rem; box-shadow:var(--shadow);
+  max-width:320px; width:88vw; text-align:center;
+}
+.stats-card h3{ font-size:1.6rem; margin-bottom:1.1rem; }
+.stat-row{ display:flex; justify-content:space-between; font-size:0.9rem; padding:0.4rem 0; border-bottom:1px dashed rgba(74,71,66,0.15); }
+.stat-row span:last-child{ color:var(--gold); font-weight:700; }
+.achieve-card{ background:var(--charcoal); color:var(--cream); border-radius:10px; padding:2rem 2.2rem; text-align:center; box-shadow:var(--shadow); }
+.achieve-card h3{ font-size:1.5rem; color:var(--gold); margin-bottom:0.3rem; }
+
+.compliment-toast{
+  position:fixed; bottom:24px; left:50%; transform:translate(-50%,20px); z-index:150;
+  background:var(--charcoal); color:var(--cream); padding:0.8rem 1.4rem; border-radius:999px;
+  font-family:'Caveat',cursive; font-size:1.05rem; opacity:0; max-width:80vw; text-align:center;
+}
+
+@media (max-width:520px){
+  .envelopes{ grid-template-columns:repeat(2,minmax(100px,150px)); }
+}
+</style>
+</head>
+<body>
+
+<div class="grain"></div>
+<div id="cursor"></div>
+<div class="flash" id="flash"></div>
+
+<div id="app">
+
+  <!-- ============ PAGE 1: LOADING ============ -->
+  <section class="page active" id="page-loading">
+    <div class="loading-wrap">
+      <h3 id="loading-text">Loading memories...</h3>
+      <div class="bar-track"><div class="bar-fill" id="bar-fill"></div></div>
+      <div class="bar-pct" id="bar-pct">0%</div>
+    </div>
+  </section>
+
+  <!-- ============ PAGE 2: WELCOME ============ -->
+  <section class="page" id="page-welcome">
+    <h1 class="welcome-heading">Happy Friendship Day,<br><span class="name" id="welcome-name">Friend</span></h1>
+    <p class="welcome-sub">Some friendships deserve more than just a message. So I made something just for you.</p>
+    <div class="polaroid" id="welcome-polaroid">
+      <div class="tape"></div>
+      <div class="photo-inner"><img id="welcome-img" alt="" /></div>
+      <div class="cap hand" id="welcome-cap">us, always</div>
+    </div>
+    <button class="btn" id="btn-begin">✨ Begin Your Journey</button>
+  </section>
+
+  <!-- ============ PAGE 3: MEMORY DELIVERY ============ -->
+  <section class="page" id="page-memories">
+    <h2 class="mem-title">Four Little Memories</h2>
+    <p class="mem-sub">Open them one at a time.</p>
+    <div class="tracker hand" id="tracker">0 / 4 memories opened</div>
+    <div class="envelopes" id="envelopes"></div>
+    <button class="btn ghost" id="btn-to-celebration" style="margin-top:2.4rem; display:none;">Continue ✨</button>
+  </section>
+
+  <div class="note-slide hand" id="note-slide"></div>
+
+  <div class="memory-detail" id="memory-detail">
+    <div class="close-x" id="memory-close">✕</div>
+    <div class="polaroid">
+      <div class="tape"></div>
+      <div class="photo-inner"><img id="detail-img" alt="" /></div>
+      <div class="cap hand" id="detail-cap"></div>
+    </div>
+    <h3 id="detail-title"></h3>
+    <p id="detail-msg"></p>
+    <div class="date hand" id="detail-date"></div>
+  </div>
+
+  <!-- ============ PAGE 4: CELEBRATION ============ -->
+  <section class="page" id="page-celebration">
+    <h1 class="celebrate-text">Happy Friendship Day</h1>
+  </section>
+
+  <!-- ============ PAGE 5: LETTER ============ -->
+  <section class="page" id="page-letter">
+    <div class="letter-env" id="letter-env">
+      <div class="body" style="position:absolute;inset:0;border-radius:6px;background:var(--cream);border:1px solid rgba(74,71,66,0.08);"></div>
+      <div class="flap" id="letter-flap" style="position:absolute;top:0;left:0;right:0;height:58%;background:var(--lavender);clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:top center;border-radius:6px 6px 0 0;transition:transform .7s cubic-bezier(.2,.9,.2,1);"></div>
+      <div class="seal" id="letter-seal">✦</div>
+    </div>
+    <p class="letter-hint hand" id="letter-hint">tap to open</p>
+    <div class="letter-paper" id="letter-paper"><p id="letter-text-content"></p></div>
+  </section>
+
+  <!-- ============ PAGE 6: PROMISE ============ -->
+  <section class="page" id="page-promise">
+    <h2 class="promise-q">Will we always stay friends?</h2>
+    <div class="promise-btns">
+      <button class="btn" data-answer="yes">Yes ❤️</button>
+      <button class="btn ghost" data-answer="absolutely">Absolutely ❤️</button>
+    </div>
+    <div class="promise-answer hand" id="promise-answer">Good choice 😊</div>
+    <button class="btn ghost" id="btn-to-ending" style="margin-top:2.6rem; display:none;">Continue ✨</button>
+  </section>
+
+  <!-- ============ PAGE 7: ENDING ============ -->
+  <section class="page" id="page-ending">
+    <div class="stars" id="stars"></div>
+    <div class="polaroid" id="ending-polaroid" style="cursor:none;">
+      <div class="tape"></div>
+      <div class="photo-inner"><img id="ending-img" alt="" /></div>
+      <div class="cap hand" id="ending-cap"></div>
+    </div>
+    <h1 class="ending-title">A final little note</h1>
+    <div class="ending-status">A friendship that keeps growing</div>
+    <p class="ending-quote">The best part of every story is the people in it.<br>Thank you for being you.</p>
+  </section>
+
+</div>
+
+<button id="music-toggle" title="Music">🔈</button>
+<div id="progress-dot"></div>
+<div class="compliment-toast hand" id="compliment-toast"></div>
+
+<div class="stats-modal" id="stats-modal">
+  <div class="stats-card">
+    <h3>Friendship Statistics</h3>
+    <div class="stat-row"><span>Happiness</span><span>100%</span></div>
+    <div class="stat-row"><span>Inside Jokes</span><span>∞</span></div>
+    <div class="stat-row"><span>Trust Level</span><span>9999+</span></div>
+    <div class="stat-row"><span>Laughs Shared</span><span>Unlimited</span></div>
+    <div class="stat-row"><span>Food Stolen</span><span>Too Much</span></div>
+    <div class="stat-row"><span>Friend Rating</span><span>11/10</span></div>
+    <button class="btn ghost" id="stats-close" style="margin-top:1.2rem;">close</button>
+  </div>
+</div>
+
+<div class="achieve-modal" id="achieve-modal">
+  <div class="achieve-card">
+    <h3>🏆 Achievement Unlocked</h3>
+    <p class="hand" style="font-size:1.3rem;">Best Friend Found</p>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG — edit everything about this gift right here.
+   This is the only section you need to touch to personalize
+   a new version for a different friend.
+   ========================================================= */
+const CONFIG = {
+  friendName: "Sambhav",          // shows on the welcome page
+  yourName: "Manavi",  // this is you, stays the same in every file            // sign-off on the letter
+
+  // Music: paste a direct .mp3 URL. Leave empty to keep the
+  // music button present but silent (no autoplay violations).
+  music: {
+    url: "",
+    volume: 0.2
+  },
+
+  // Any of these can be a real photo URL (jpg/png) or left ""
+  // to show a soft placeholder frame instead.
+  welcomePhoto: { src: "s1.jpg", caption: "We Argue. We Laugh. We Repeat." },
+  endingPhoto:  { src: "s7.jpg", caption: "Too Many Memories, Too Many Fights, Forever Friends" },
+
+  memories: [
+    { title: "You Should Be Grateful You Have Me.",
+      teaser: "Chaos & Comfort.",
+      caption: "ur Annoying n I'm Annoying. Perfect.",
+      message: "Some friendships are built on deep conversations. Ours? Mostly on annoying each other, arguing over absolutely nothing, and somehow laughing . I still don't know how we manage it, but honestly... I wouldn't change it for anything.",
+      date: "", photo: "s2.jpg" },
+    { title: "Unfortunately, you're irreplaceable",
+      teaser: "My Favorite Idiot",
+      caption: "stop irritating me",
+      message: "Behind all the teasing and endless arguments is a friendship I genuinely treasure. Thank you for being someone around whom I never have to pretend to be anyone else. You make even the most ordinary days a lot more fun, and I'm really glad life decided we should become friends.",
+      date: "", photo: "s4.jpg" },
+    { title: "Chaos Never Looked Better.",
+      teaser: "The Friend I Didn't Know I Needed",
+      caption: "Forever Friends. Forever Memories.",
+      message: "I don't think I say this enough, but I'm really grateful for you. Thank you for every laugh, every random plan, every conversation, and every moment that turned into a memory. Life genuinely feels a little happier with you around.",
+      date: "", photo: "s5.jpg" },
+    { title: "I Deserve an Award for Tolerating You",
+      teaser: "You annoy me but still make me laugh",
+      caption: "My Fav Headache..",
+      message: "You're probably one of the most annoying people I've ever met. But somehow, when you're not around, everything feels a little too quiet. I guess I've gotten used to your nonsense... and maybe I don't mind it anymore.",
+      date: "", photo: "s3.jpg" }
+  ],
+
+  letter: `One Last Thing...
+If you've made it this far, then thank you for taking this little journey with me.
+I know we aren't the kind of friends who sit and say emotional things to each other. We're much better at annoying each other, making fun of one another, arguing over the smallest things, and then laughing like nothing ever happened. That's just who we are, and honestly, I wouldn't change it for anything.
+But behind all those jokes, there's something I've probably never said properly.
+Thank you.
+Thank you for being the person who made ordinary days feel exciting, for every random plan, every conversation, every stupid joke, every unnecessary argument, and every memory that somehow became one of my favorites. Around you, I never have to think about how I should act or what I should say. I can just be myself, and that's one of the greatest gifts a friendship can give.
+I know I don't always express how much I appreciate you. Sometimes I forget to say thank you, sometimes I hide it behind sarcasm or another joke, but that doesn't change how much this friendship means to me.
+You've become more than just a friend—you've become family away from home.
+As this year comes to an end, I know life is going to change. We'll get busy, meet new people, and maybe we won't get to see each other as often as we do now. That thought honestly scares me a little but I just hope that no matter where life takes us, we never lose this bond. I hope years from now we're still teasing each other, still making random plans, still laughing.
+
+Happy Friendship Day Sambhav.
+
+Love,
+${'{{yourName}}'}`,
+
+  compliments: [
+    "You make ordinary days unforgettable.",
+    "Thank you for existing.",
+    "Life became brighter after meeting you.",
+    "I'd choose this friendship again every time.",
+    "You're the proof that good people exist.",
+    "Some friendships feel like home. This is one.",
+    "You make hard days easier just by being you.",
+    "I don't say it enough, but I notice everything you do.",
+    "You're rare, and I know it.",
+    "Every inside joke with you is a tiny treasure.",
+    "You make me laugh in a way no one else does.",
+    "I'm a better person for knowing you.",
+    "You've never once made me feel alone.",
+    "You remember the small things. That means everything.",
+    "You're the friend everyone deserves and few get.",
+    "I trust you with things I trust no one else with.",
+    "You show up, every single time.",
+    "This friendship is one of my favourite things about my life.",
+    "You make ordinary rooms feel warmer.",
+    "I hope I make you feel even half of what you make me feel.",
+    "Some people come and go. You stayed. I noticed."
+  ]
+};
+CONFIG.letter = CONFIG.letter.replace('{{yourName}}', CONFIG.yourName);
+
+/* =========================================================
+   STATE + HELPERS
+   ========================================================= */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+let openedCount = 0;
+let promiseCleared = false;
+
+function setPlaceholderOrPhoto(imgEl, src, fallbackGradientEl){
+  if(src){
+    imgEl.src = src;
+    imgEl.style.display = 'block';
+  } else {
+    imgEl.style.display = 'none';
+  }
+}
+
+function goToPage(id){
+  $$('.page.active').forEach(p => p.classList.remove('active'));
+  const target = $('#'+id);
+  target.classList.add('active');
+  gsap.fromTo(target, {opacity:0, y:14}, {opacity:1, y:0, duration:1, ease:'power2.out'});
+  updateProgressDot(id);
+}
+
+const pageOrder = ['page-loading','page-welcome','page-memories','page-celebration','page-letter','page-promise','page-ending'];
+function updateProgressDot(id){
+  const idx = pageOrder.indexOf(id);
+  $('#progress-dot').textContent = idx>0 ? `${idx} / ${pageOrder.length-1}` : '';
+}
+
+/* custom cursor + click sparkles */
+const cursor = $('#cursor');
+window.addEventListener('pointermove', e=>{
+  gsap.to(cursor, {left:e.clientX, top:e.clientY, duration:0.15, ease:'power1.out'});
+});
+document.addEventListener('click', e=>{
+  spawnSparkle(e.clientX, e.clientY);
+});
+function spawnSparkle(x,y){
+  for(let i=0;i<5;i++){
+    const s = document.createElement('div');
+    s.style.cssText = `position:fixed; left:${x}px; top:${y}px; width:4px; height:4px; border-radius:50%; background:#D8B87C; pointer-events:none; z-index:9998;`;
+    document.body.appendChild(s);
+    const angle = Math.random()*Math.PI*2;
+    const dist = 20 + Math.random()*30;
+    gsap.to(s, {
+      x: Math.cos(angle)*dist, y: Math.sin(angle)*dist,
+      opacity:0, duration:0.6+Math.random()*0.3, ease:'power2.out',
+      onComplete:()=>s.remove()
+    });
+  }
+}
+
+/* shutter sound (tiny synthesized click, no external file needed) */
+let audioCtx;
+function shutterSound(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.value = 900;
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+0.08);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+0.08);
+  }catch(e){}
+}
+
+/* =========================================================
+   MUSIC
+   ========================================================= */
+let howl = null;
+let musicOn = false;
+let musicStarted = false;
+function initMusicIfNeeded(){
+  if(musicStarted) return;
+  musicStarted = true;
+  if(!CONFIG.music.url){
+    $('#music-toggle').style.opacity = '0.4';
+    $('#music-toggle').title = 'Add a music URL in CONFIG to enable';
+    return;
+  }
+  howl = new Howl({ src:[CONFIG.music.url], loop:true, volume:CONFIG.music.volume });
+  howl.play();
+  musicOn = true;
+  $('#music-toggle').textContent = '🔊';
+}
+$('#music-toggle').addEventListener('click', ()=>{
+  if(!CONFIG.music.url) return;
+  if(!musicStarted){ initMusicIfNeeded(); return; }
+  musicOn = !musicOn;
+  if(musicOn){ howl.play(); $('#music-toggle').textContent='🔊'; }
+  else { howl.pause(); $('#music-toggle').textContent='🔈'; }
+});
+
+/* =========================================================
+   PAGE 1 — LOADING
+   ========================================================= */
+const loadingMessages = [
+  "Loading memories...",
+  "Collecting laughter...",
+  "Finding inside jokes...",
+  "Preparing something special...",
+  "Almost there...",
+  "Friendship Loaded ❤️"
+];
+function runLoading(){
+  const fill = $('#bar-fill'), pct = $('#bar-pct'), txt = $('#loading-text');
+  let progress = 0;
+  const msgTimer = setInterval(()=>{
+    const idx = Math.min(Math.floor(progress/20), loadingMessages.length-1);
+    txt.textContent = loadingMessages[idx];
+  }, 480);
+
+  gsap.to({}, {
+    duration: 3.4, ease:'power1.inOut',
+    onUpdate: function(){
+      progress = this.progress()*100;
+      fill.style.width = progress+'%';
+      pct.textContent = Math.round(progress)+'%';
+    },
+    onComplete: ()=>{
+      clearInterval(msgTimer);
+      txt.textContent = loadingMessages[loadingMessages.length-1];
+      pct.textContent = '100%';
+      setTimeout(()=>{
+        gsap.to('#flash', {opacity:1, duration:0.1, onComplete:()=>{
+          gsap.to('#flash', {opacity:0, duration:0.5, delay:0.05});
+        }});
+        setTimeout(()=> goToPage('page-welcome'), 260);
+      }, 500);
+    }
+  });
+}
+
+/* =========================================================
+   PAGE 2 — WELCOME
+   ========================================================= */
+function setupWelcome(){
+  $('#welcome-name').textContent = CONFIG.friendName;
+  $('#welcome-cap').textContent = CONFIG.welcomePhoto.caption;
+  setPlaceholderOrPhoto($('#welcome-img'), CONFIG.welcomePhoto.src);
+  $('#btn-begin').addEventListener('click', ()=>{
+    initMusicIfNeeded();
+    shutterSound();
+    goToPage('page-memories');
+  }, {once:true});
+}
+
+/* =========================================================
+   PAGE 3 — MEMORY DELIVERY
+   ========================================================= */
+function buildEnvelopes(){
+  const wrap = $('#envelopes');
+  CONFIG.memories.forEach((mem, i)=>{
+    const el = document.createElement('div');
+    el.className = 'envelope-wrap';
+    el.innerHTML = `
+      <div class="envelope" data-idx="${i}" data-stage="0">
+        <div class="body"></div>
+        <div class="flap"></div>
+        <div class="seal">✦</div>
+      </div>
+      <div class="envelope-label hand">memory ${i+1}</div>
+    `;
+    wrap.appendChild(el);
+    const envEl = $('.envelope', el);
+    // gentle float
+    gsap.to(envEl, {
+      y: -8, duration: 2.2+Math.random(), repeat:-1, yoyo:true, ease:'sine.inOut',
+      delay: Math.random()
+    });
+    envEl.addEventListener('click', ()=> handleEnvelopeClick(envEl, mem, i));
+  });
+}
+
+function handleEnvelopeClick(envEl, mem, idx){
+  const stage = parseInt(envEl.dataset.stage);
+  if(stage === 0){
+    envEl.classList.add('shake');
+    setTimeout(()=>{
+      envEl.classList.remove('shake');
+      envEl.classList.add('open');
+      envEl.dataset.stage = '1';
+      showNoteSlide(mem.teaser);
+    }, 420);
+  } else if(stage === 1){
+    envEl.dataset.stage = '2';
+    envEl.classList.add('opened-state');
+    shutterSound();
+    openMemoryDetail(mem);
+    openedCount++;
+    $('#tracker').textContent = `${openedCount} / ${CONFIG.memories.length} memories opened`;
+    if(openedCount === CONFIG.memories.length){
+      $('#btn-to-celebration').style.display = 'inline-block';
+      gsap.fromTo('#btn-to-celebration', {opacity:0, y:10}, {opacity:1, y:0, duration:0.8});
+    }
+  }
+}
+
+function showNoteSlide(text){
+  const note = $('#note-slide');
+  note.textContent = text + '  (tap again)';
+  gsap.fromTo(note, {opacity:0, y:20}, {opacity:1, y:0, duration:0.5, ease:'power2.out'});
+  gsap.to(note, {opacity:0, y:20, duration:0.5, delay:2.2, ease:'power2.in'});
+}
+
+function openMemoryDetail(mem){
+  setPlaceholderOrPhoto($('#detail-img'), mem.photo);
+  $('#detail-cap').textContent = mem.caption;
+  $('#detail-title').textContent = mem.title;
+  $('#detail-msg').textContent = mem.message;
+  $('#detail-date').textContent = mem.date || '';
+  const modal = $('#memory-detail');
+  modal.classList.add('active');
+  gsap.fromTo(modal.querySelector('.polaroid'), {y:40, opacity:0, rotate:6}, {y:0, opacity:1, rotate:-2, duration:0.8, ease:'power2.out'});
+}
+$('#memory-close').addEventListener('click', ()=> $('#memory-detail').classList.remove('active'));
+
+$('#btn-to-celebration').addEventListener('click', ()=>{
+  goToPage('page-celebration');
+  runCelebration();
+});
+
+/* =========================================================
+   PAGE 4 — CELEBRATION
+   ========================================================= */
+function runCelebration(){
+  if(window.confetti){
+    confetti({ particleCount: 40, spread: 70, startVelocity: 22, gravity: 0.5,
+      colors:['#D8B87C','#D8CFE8','#D6E8F2','#C9D8C5'], origin:{y:0.6} });
+  }
+  setTimeout(()=>{
+    goToPage('page-letter');
+    setupLetter();
+  }, 3000);
+}
+
+/* =========================================================
+   PAGE 5 — LETTER
+   ========================================================= */
+let letterOpened = false;
+function setupLetter(){
+  $('#letter-env').addEventListener('click', function handler(){
+    if(letterOpened) return;
+    letterOpened = true;
+    $('#letter-flap').style.transform = 'rotateX(160deg)';
+    gsap.to('#letter-seal', {opacity:0, scale:0.4, duration:0.4});
+    $('#letter-hint').style.opacity = '0';
+    setTimeout(()=>{
+      $('#letter-env').style.display = 'none';
+      const paper = $('#letter-paper');
+      paper.style.display = 'block';
+      gsap.fromTo(paper, {opacity:0, scale:0.9, y:20}, {opacity:1, scale:1, y:0, duration:0.9, ease:'power2.out'});
+      typewriter($('#letter-text-content'), CONFIG.letter, 28, ()=>{
+        const cont = document.createElement('button');
+        cont.className = 'btn ghost';
+        cont.style.marginTop = '1.4rem';
+        cont.textContent = 'Continue ✨';
+        cont.addEventListener('click', ()=> goToPage('page-promise'));
+        paper.appendChild(cont);
+      });
+    }, 600);
+  }, {once:true});
+}
+function typewriter(el, text, speed, onDone){
+  el.textContent = '';
+  let i = 0;
+  const timer = setInterval(()=>{
+    el.textContent += text[i];
+    i++;
+    if(i>=text.length){ clearInterval(timer); if(onDone) onDone(); }
+  }, speed);
+}
+
+/* =========================================================
+   PAGE 6 — PROMISE
+   ========================================================= */
+$$('#page-promise [data-answer]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(promiseCleared) return;
+    promiseCleared = true;
+    gsap.to(btn, {scale:1.08, duration:0.2, yoyo:true, repeat:1});
+    const ans = $('#promise-answer');
+    gsap.fromTo(ans, {opacity:0, y:10}, {opacity:1, y:0, duration:0.6});
+    $('#btn-to-ending').style.display = 'inline-block';
+    gsap.fromTo('#btn-to-ending', {opacity:0}, {opacity:1, duration:0.6, delay:0.3});
+  });
+});
+$('#btn-to-ending').addEventListener('click', ()=>{
+  goToPage('page-ending');
+  setupEnding();
+});
+
+/* =========================================================
+   PAGE 7 — ENDING
+   ========================================================= */
+let endingSetup = false;
+function setupEnding(){
+  if(endingSetup) return;
+  endingSetup = true;
+  setPlaceholderOrPhoto($('#ending-img'), CONFIG.endingPhoto.src);
+  $('#ending-cap').textContent = CONFIG.endingPhoto.caption;
+
+  const starsWrap = $('#stars');
+  for(let i=0;i<60;i++){
+    const s = document.createElement('div');
+    s.className = 'star-dot';
+    s.style.left = Math.random()*100+'%';
+    s.style.top = Math.random()*70+'%';
+    s.style.animation = `twinkle ${1.6+Math.random()*2}s ease-in-out infinite`;
+    s.style.animationDelay = Math.random()*2+'s';
+    starsWrap.appendChild(s);
+  }
+  for(let i=0;i<6;i++){
+    const l = document.createElement('div');
+    l.className = 'lantern';
+    l.style.left = (10+Math.random()*80)+'%';
+    starsWrap.appendChild(l);
+    gsap.to(l, {
+      y: -window.innerHeight*1.1, x: (Math.random()-0.5)*60,
+      duration: 10+Math.random()*6, repeat:-1, ease:'none',
+      delay: i*1.6
+    });
+  }
+
+  // easter egg: click final polaroid 5x
+  let clicks = 0;
+  $('#ending-polaroid').addEventListener('click', ()=>{
+    clicks++;
+    spawnSparkle(event.clientX, event.clientY);
+    if(clicks===5){
+      $('#achieve-modal').classList.add('active');
+      if(window.confetti) confetti({particleCount:30, spread:60, origin:{y:0.5}});
+      setTimeout(()=> $('#achieve-modal').classList.remove('active'), 2600);
+    }
+  });
+}
+
+/* =========================================================
+   HIDDEN GLOWING STAR — easter egg, appears on memories page
+   ========================================================= */
+function placeSecretStar(){
+  const star = document.createElement('div');
+  star.className = 'secret-star';
+  star.style.left = (8+Math.random()*10)+'%';
+  star.style.top = (85+Math.random()*8)+'%';
+  document.body.appendChild(star);
+  star.addEventListener('click', ()=>{
+    $('#stats-modal').classList.add('active');
+    star.remove();
+  });
+}
+$('#stats-close').addEventListener('click', ()=> $('#stats-modal').classList.remove('active'));
+
+/* =========================================================
+   RANDOM COMPLIMENT ON LOAD
+   ========================================================= */
+function showRandomCompliment(){
+  const list = CONFIG.compliments;
+  const text = list[Math.floor(Math.random()*list.length)];
+  const toast = $('#compliment-toast');
+  toast.textContent = text;
+  setTimeout(()=>{
+    gsap.fromTo(toast, {opacity:0, y:20}, {opacity:1, y:0, duration:0.6});
+    setTimeout(()=> gsap.to(toast, {opacity:0, y:20, duration:0.6}), 4200);
+  }, 1200);
+}
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', ()=>{
+  setupWelcome();
+  buildEnvelopes();
+  placeSecretStar();
+  showRandomCompliment();
+  runLoading();
+});
+</script>
+</body>
+</html>
